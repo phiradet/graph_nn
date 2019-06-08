@@ -29,7 +29,7 @@ class SymbolInfoSpider(scrapy.Spider):
         if run_mode == "test":
             queries = ["NUMBER"]
         elif run_mode == "full":
-            queries = ["NUMBER"] + string.ascii_uppercase
+            queries = ["NUMBER"] + list(string.ascii_uppercase)
         else:
             raise ValueError(f"Unknown mode {run_mode}")
 
@@ -40,20 +40,7 @@ class SymbolInfoSpider(scrapy.Spider):
             url = f"{url_prefix}&prefix={q}"
             yield scrapy.Request(url=url, callback=self.parse)
 
-    def _get_symbol(self, url: str) -> Optional[str]:
-        symbol = __class__.symbol_pattern.findall(url)
-        if len(symbol) == 1:
-            return symbol[0]
-        elif len(symbol) == 0:
-            self.log(f"Cannot extract symbol for {url}", level=logging.WARNING)
-            return None
-        else:
-            self.log(f"Found multiple symbols [{symbol}] for {url}",
-                     level=logging.WARNING)
-            return None
-
-    def _save_original(self, data_dir: str, page_type: str, response: Response):
-        symbol = self._get_symbol(response.url) or "default"
+    def _save_original(self, symbol: str, data_dir: str, page_type: str, response: Response):
         filename = os.path.join(data_dir, f"{symbol}-{page_type}.html")
 
         try:
@@ -72,6 +59,7 @@ class SymbolInfoSpider(scrapy.Spider):
                      level=logging.WARNING)
             symbol = "Unknown"
             company = "Unknown"
+            self.log(f"Cannot extract symbol and company for {response.url}", level=logging.WARNING)
         else:
             symbol_corp_spl = symbol_corp.split(":")
             symbol = symbol_corp_spl[0].strip()
@@ -127,13 +115,15 @@ class SymbolInfoSpider(scrapy.Spider):
             else:
                 return None
 
+        symbol, company = self._extract_comp_name(response)
+
         data_dir = getattr(self, "data_dir", None)
         if data_dir is not None:
-            self._save_original(data_dir=data_dir,
+            self._save_original(symbol=symbol,
+                                data_dir=data_dir,
                                 page_type="info",
                                 response=response)
 
-        symbol, company = self._extract_comp_name(response)
         rows = response.css("table tr td div.row")
 
         symbol_info = {"type": "info",
@@ -166,13 +156,15 @@ class SymbolInfoSpider(scrapy.Spider):
         Parse company major holders page such as
         https://www.set.or.th/set/companyholder.do?symbol=A&ssoPageId=6&language=en&country=TH
         """
-        data_dir = getattr(self, "data_dir", None)
-        if data_dir is not None:
-            self._save_original(data_dir=data_dir,
-                                page_type="holders",
-                                response=response)
 
         symbol, company = self._extract_comp_name(response)
+
+        data_dir = getattr(self, "data_dir", None)
+        if data_dir is not None:
+            self._save_original(symbol=symbol,
+                                data_dir=data_dir,
+                                page_type="holders",
+                                response=response)
 
         holder_rows = response.css("tbody tr")
         for row in holder_rows:
