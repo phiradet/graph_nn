@@ -8,6 +8,11 @@ from betamax.fixtures.unittest import BetamaxTestCase
 from ..set_crawler.spiders.symbol_info_spider import SymbolInfoSpider
 
 with Betamax.configure() as config:
+    cassette_dir = os.path.join(str(Path.home()), 'cassettes')
+
+    if not os.path.exists(cassette_dir):
+        os.mkdir(cassette_dir)
+
     config.cassette_library_dir = os.path.join(str(Path.home()), 'cassettes')
     config.preserve_exact_body_bytes = True
 
